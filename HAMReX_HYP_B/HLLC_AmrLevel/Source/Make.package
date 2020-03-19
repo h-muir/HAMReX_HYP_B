@@ -1,0 +1,7 @@
+CEXE_sources += utility.cpp euler.cpp magnetism.cpp AmrLevelAdv.cpp LevelBldAdv.cpp main.cpp 
+
+f90EXE_sources += bc_fill_nd.f90
+
+CEXE_headers += classdefs.H structdefs.H funcdefs.H magnetism.H AmrLevelAdv.H
+
+FEXE_headers += Adv_F.H 
