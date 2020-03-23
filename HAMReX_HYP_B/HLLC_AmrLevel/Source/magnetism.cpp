@@ -18,10 +18,12 @@ using namespace amrex;
 
 
 
-EMField::EMField(ParameterStruct& p, Geometry const& geom, AccessVariable& V){
+EMField::EMField(ParameterStruct& p, Geometry const& geom, BoxArray const& grids, DistributionMapping const& dmap){
 	
 	initialise_params(p);
-	//initialise_fabs(S, geom, V);
+	S_geom = geom;
+    S_grids = grids;
+    S_dmap = dmap;
 	
 }
 	
@@ -79,6 +81,72 @@ void EMField::initialise_fabs(MultiFab& S_EM, Geometry const& geom, AccessVariab
     //FillDomainBoundary(rhs, geom, bc_vec[0]);
     //rhs.setVal(0.0);
     */
+}
+
+void EMField::defineSolution(MultiFab& S_EM, AccessVariable& V){
+	
+	solution.define(S_grids, S_dmap, 1, ng);
+	MultiFab::Copy(solution, S_EM, V["phi"], 0, 1, ng);
+	
+}
+
+void EMField::defineScalars(){
+	
+	A_scalar = 0;
+	B_scalar = 1;
+	
+}
+
+void EMField::computeAlphaFab(){
+	alpha_fab.define(S_grids, S_dmap, 1, 0); //nc = 1, ng = 0
+	alpha_fab.setVal(1.0);
+}
+
+void EMField::computeFaceSigmaFabs(MultiFab& S_EM, AccessVariable& V){
+	
+	sigma_fab.define(S_grids, S_dmap, 1, ng);
+	MultiFab::Copy(sigma_fab, S_EM, V["sigma"], 0, 1, ng);
+	
+	for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
+	{
+		const BoxArray& ba = amrex::convert(sigma_fab.boxArray(),
+											IntVect::TheDimensionVector(idim));
+		face_sigma_fabs[idim].define(ba, sigma_fab.DistributionMap(), 1, 0);
+		
+	}
+		
+	amrex::average_cellcenter_to_face(GetArrOfPtrs(face_sigma_fabs), sigma_fab, S_geom);
+    
+}
+
+void EMField::computeRHS(MultiFab& S_EM, AccessVariable& V){
+	
+	rhs.define(S_grids, S_dmap, 1, 0);
+	
+	VcrossB.define(S_grids, S_dmap, 3, ng);
+	
+	computeVcrossB(S_EM, VcrossB, V); //assumes ghost cells are filled through tilebox()
+	
+	int lo_bc[BL_SPACEDIM];
+	int hi_bc[BL_SPACEDIM];
+	for (int i = 0; i < BL_SPACEDIM; ++i) {
+		lo_bc[i] = BCType::foextrap;
+		hi_bc[i] = BCType::foextrap;
+	}
+	BCRec bc(lo_bc, hi_bc);
+	Vector<BCRec> EM_bc_vec(3, bc);
+	Vector<BCRec> single_bc(1, bc);	
+	
+	VcrossB.FillBoundary();
+	FillDomainBoundary(VcrossB, S_geom, EM_bc_vec);
+	
+	divVcrossB.define(S_grids, S_dmap, 1, 0);
+	compute_divVcrossB(S_geom, sigma_fab, VcrossB, divVcrossB);
+	
+	MultiFab::Copy(rhs, divVcrossB, 0, 0, 1, 0);
+	//rhs.FillBoundary();
+	//FillDomainBoundary(rhs, S_geom, single_bc);
+	
 }
 
 void EMField::computeVcrossB(MultiFab& S_EM, MultiFab &S_out, AccessVariable V){

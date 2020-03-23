@@ -609,18 +609,32 @@ AmrLevelAdv::advance (Real time,
 	//------------------------EMField----------------------------------
 
     //EM field:
-	if(SimSettings.Bfield == "dipole" ){
+	if(SimSettings.Bfield == "dipole"){
 		
 		cout << "EMField Linear solve on level: " << level << endl;
+		/*
+		bool has_old_data = state[0].hasOldData();
+  
+		// allocOldData does old_data.reset if old_data is null, otherwise does nothing
+		state[0].allocOldData();
+		if(!has_old_data)
+		{
+		state[0].oldData().setVal(0.0);
+		}
+		// Moves current data into old data (and vice-versa)
+		state[0].swapTimeLevels(dt);
 		
-		MultiFab& S_old_data = get_old_data(Phi_Type);		
-
-		EMField EM_lev(Parameters, geom, V);
+		MultiFab& S_old_data = get_old_data(Phi_Type);
+		
+		MultiFab& S_new_data = get_new_data(Phi_Type);		
+		*/
+		EMField EM_lev(Parameters, geom, grids, dmap);
 		
 		LPInfo info;
 		info.setAgglomeration(EM_lev.agglomeration);
 		info.setConsolidation(EM_lev.consolidation);
-		info.setMetricTerm(false);
+		info.setMaxCoarseningLevel(EM_lev.max_coarsening_level);
+		//info.setMetricTerm(false);
 		
 		MLABecLaplacian mlabec({geom}, {grids}, {dmap}, info);
 		
@@ -638,6 +652,7 @@ AmrLevelAdv::advance (Real time,
 		
 		if(level > 0){
 			AmrLevelAdv& crse_level = getLevel(level-1);
+			Real crse_time = crse_level.state[0].curTime();
 			const BoxArray& crse_box = crse_level.boxArray();
 			const DistributionMapping& crse_dmap = crse_level.DistributionMap();
 			Sol_crse.define(crse_box,parent->DistributionMap(level-1),1,ng);
@@ -645,72 +660,25 @@ AmrLevelAdv::advance (Real time,
 			mlabec.setCoarseFineBC(&Sol_crse, EM_lev.ref_ratio);
 		}
 		
-		MultiFab solution(grids, dmap, 1, ng);
-		FillPatch(*this, solution, ng, time, Phi_Type, V["phi"], 1);
-		mlabec.setLevelBC(0,&solution);
-		
-		int lo_bc[BL_SPACEDIM];
-		int hi_bc[BL_SPACEDIM];
-		for (int i = 0; i < BL_SPACEDIM; ++i) {
-			lo_bc[i] = BCType::foextrap;
-			hi_bc[i] = BCType::foextrap;
-		}
-		BCRec bc(lo_bc, hi_bc);
-		Vector<BCRec> EM_bc_vec(3, bc);
-		Vector<BCRec> single_bc(1, bc);
-		
-		MultiFab alpha_fab(grids, dmap, 1, ng);
-		alpha_fab.setVal(1.0);
-		//alpha_fab.FillBoundary();
-		//FillDomainBoundary(alpha_fab, geom, single_bc);
-		
-		MultiFab sigma_fab(grids, dmap, 1, ng);
-		//FillPatch(*this, sigma_fab, ng, state[0].prevTime(), Phi_Type, V["sigma"], 1);
-		MultiFab::Copy(sigma_fab, S_new, V["sigma"], 0, 1, 0);
-		sigma_fab.FillBoundary();
-		FillDomainBoundary(sigma_fab, geom, single_bc);
-		//CHECK later if domain boundary needs to be filled for finite diff routines on sigma
-		
 		MultiFab S_EM(grids, dmap, NUM_STATE, ng);
-		//FillPatch(*this, S_EM, ng, state[0].prevTime(), Phi_Type, 0, NUM_STATE);
-		MultiFab::Copy(S_EM, S_new, 0, 0, NUM_STATE, 0);
+		FillPatch(*this, S_EM, ng, time, Phi_Type, 0, NUM_STATE);
 		S_EM.FillBoundary();
 		FillDomainBoundary(S_EM, geom, bc_vec);
-
-		Real A_scalar = 0;
-		Real B_scalar = 1;
 		
-		MultiFab rhs(grids, dmap, 1, ng);
+		EM_lev.defineSolution(S_EM, V);
+		mlabec.setLevelBC(0,&EM_lev.solution);
 		
-		MultiFab VcrossB(grids, dmap, 3, ng);
-		EM_lev.computeVcrossB(S_EM, VcrossB, V);
-		VcrossB.FillBoundary();
-		FillDomainBoundary(VcrossB, geom, EM_bc_vec);
-		MultiFab divVcrossB(grids, dmap, 1, 0);
-		EM_lev.compute_divVcrossB(geom, sigma_fab, VcrossB, divVcrossB);
-		MultiFab::Copy(rhs, divVcrossB, 0, 0, 1, 0);
-		rhs.FillBoundary();
-		FillDomainBoundary(rhs, geom, single_bc);
+		EM_lev.computeAlphaFab();
+		mlabec.setACoeffs(0, EM_lev.alpha_fab);
 		
-		//mlabec.setLevelBC(0, &solution);
-	
-		mlabec.setScalars(A_scalar, B_scalar);
-
-		mlabec.setACoeffs(0, alpha_fab);
+		EM_lev.defineScalars();
+		mlabec.setScalars(EM_lev.A_scalar, EM_lev.B_scalar);
 		
-		Array<MultiFab,AMREX_SPACEDIM> face_sigma_fab;
 		
-		for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
-		{
-			const BoxArray& ba = amrex::convert(sigma_fab.boxArray(),
-												IntVect::TheDimensionVector(idim));
-			face_sigma_fab[idim].define(ba, sigma_fab.DistributionMap(), 1, 0);
-			
-		}
+		EM_lev.computeFaceSigmaFabs(S_EM, V);
+		mlabec.setBCoeffs(0, amrex::GetArrOfConstPtrs(EM_lev.face_sigma_fabs));
 		
-		amrex::average_cellcenter_to_face(GetArrOfPtrs(face_sigma_fab), sigma_fab, geom);
-		
-		mlabec.setBCoeffs(0, amrex::GetArrOfConstPtrs(face_sigma_fab));
+		EM_lev.computeRHS(S_EM, V);
 		
 		MLMG mlmg(mlabec);
 		mlmg.setMaxIter(EM_lev.max_iter);
@@ -718,15 +686,16 @@ AmrLevelAdv::advance (Real time,
 		mlmg.setVerbose(EM_lev.verbose);
 		mlmg.setBottomVerbose(EM_lev.bottom_verbose);
 		
-		mlmg.solve({&solution}, {&rhs}, EM_lev.tol_rel, EM_lev.tol_abs);
+		mlmg.solve({&EM_lev.solution}, {&EM_lev.rhs}, EM_lev.tol_rel, EM_lev.tol_abs);
 		
-		MultiFab::Copy(S_EM, solution, 0, V["phi"], 1, S_EM.nGrow()); 		//fills S_EM with phi solution
-		MultiFab gradPhi(S_EM.boxArray(), S_EM.DistributionMap(), 3, 0);
-		EM_lev.compute_gradPhi(geom, solution, gradPhi);
-		EM_lev.computeJfield(S_EM, gradPhi, VcrossB, sigma_fab, V); 		//fills S_EM with J_R, J_z, J_theta, J_abs solution
+		
+		MultiFab::Copy(S_EM, EM_lev.solution, 0, V["phi"], 1, S_EM.nGrow()); 		//fills S_EM with phi solution
+		MultiFab gradPhi(grids, dmap, 3, 0);
+		EM_lev.compute_gradPhi(geom, EM_lev.solution, gradPhi);
+		EM_lev.computeJfield(S_EM, gradPhi, EM_lev.VcrossB, EM_lev.sigma_fab, V); 		//fills S_EM with J_R, J_z, J_theta, J_abs solution
 		
 		MultiFab::Copy(S_new, S_EM, 0, 0, NUM_STATE, S_new.nGrow());
-
+		
 	}
     //-----------------------------------------------------------------
 

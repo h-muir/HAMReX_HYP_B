@@ -1,26 +1,20 @@
- 0: amrex::BLBackTrace::print_backtrace_info(__sFILE*) (in main2d.gnu.DEBUG.ex) (AMReX_BLBackTrace.cpp:163)
+ 0: amrex::BLBackTrace::print_backtrace_info(__sFILE*) (in main2d.gnu.ex) (AMReX_BLBackTrace.cpp:163)
 
- 1: amrex::BLBackTrace::handler(int) (in main2d.gnu.DEBUG.ex) (AMReX_BLBackTrace.cpp:69)
+ 1: amrex::BLBackTrace::handler(int) (in main2d.gnu.ex) (AMReX_BLBackTrace.cpp:71)
 
- 2: amrex::ParallelDescriptor::Abort(int, bool) (in main2d.gnu.DEBUG.ex) (AMReX_ParallelDescriptor.cpp:1734)
+ 2: amrex::detail::Assert_host_doit(char const*, char const*, int, char const*) (in main2d.gnu.ex) (AMReX.cpp:0)
 
- 3: amrex::detail::Assert_host_doit(char const*, char const*, int, char const*) (in main2d.gnu.DEBUG.ex) (AMReX.cpp:0)
+ 3: amrex::MLCellLinOp::setLevelBC(int, amrex::MultiFab const*) (in main2d.gnu.ex) (AMReX_MLCellLinOp.cpp:167)
 
- 4: amrex::Assert(char const*, char const*, int, char const*) (in main2d.gnu.DEBUG.ex) (AMReX.H:148)
+ 4: AmrLevelAdv::advance(double, double, int, int) (in main2d.gnu.ex) (AmrLevelAdv.cpp:0)
 
- 5: amrex::Vector<amrex::EB2::GShopLevel<amrex::EB2::GeometryShop<amrex::EB2::SphereIF> >, std::__1::allocator<amrex::EB2::GShopLevel<amrex::EB2::GeometryShop<amrex::EB2::SphereIF> > > >::operator[](unsigned long) const (in main2d.gnu.DEBUG.ex) (AMReX_Vector.H:38)
+ 5: amrex::Amr::timeStep(int, double, int, int, double) (in main2d.gnu.ex) (AMReX_Amr.cpp:0)
 
- 6: amrex::EB2::IndexSpaceImp<amrex::EB2::GeometryShop<amrex::EB2::SphereIF> >::getLevel(amrex::Geometry const&) const (in main2d.gnu.DEBUG.ex) (AMReX_EB2_IndexSpaceI.H:63)
+ 6: amrex::Amr::timeStep(int, double, int, int, double) (in main2d.gnu.ex) (AMReX_Amr.cpp:0)
 
- 7: amrex::makeEBFabFactory(amrex::Geometry const&, amrex::BoxArray const&, amrex::DistributionMapping const&, amrex::Vector<int, std::__1::allocator<int> > const&, amrex::EBSupport) (in main2d.gnu.DEBUG.ex) (AMReX_EBFabFactory.cpp:103)
+ 7: amrex::Amr::coarseTimeStep(double) (in main2d.gnu.ex) (AMReX_Vector.H:33)
 
- 8: AmrLevelAdv::advance(double, double, int, int) (in main2d.gnu.DEBUG.ex) (AmrLevelAdv.cpp:560)
+ 8: main (in main2d.gnu.ex) (main.cpp:77)
 
- 9: amrex::Amr::timeStep(int, double, int, int, double) (in main2d.gnu.DEBUG.ex) (AMReX_Amr.cpp:2112)
-
-10: amrex::Amr::coarseTimeStep(double) (in main2d.gnu.DEBUG.ex) (AMReX_Amr.cpp:2428)
-
-11: main (in main2d.gnu.DEBUG.ex) (main.cpp:77)
-
-12: start (in libdyld.dylib) + 1
+ 9: start (in libdyld.dylib) + 1
 

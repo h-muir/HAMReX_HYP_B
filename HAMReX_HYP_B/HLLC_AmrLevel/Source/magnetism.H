@@ -13,8 +13,13 @@ class EMField
 {
 	public:
 	
-	EMField(ParameterStruct& p, Geometry const& geom, AccessVariable& V);
+	EMField(ParameterStruct& p, Geometry const& geom, BoxArray const& grids, DistributionMapping const& dmap);
 	void initialise_params(ParameterStruct& p);
+	void defineSolution(MultiFab& S_EM, AccessVariable& V);
+	void computeAlphaFab();
+	void defineScalars();
+	void computeFaceSigmaFabs(MultiFab& S_EM, AccessVariable& V);
+	void computeRHS(MultiFab& S_EM, AccessVariable& V);
 	void computeVcrossB(MultiFab& S_EM, MultiFab &S_out, AccessVariable V);
 	void compute_divVcrossB(Geometry const& geom, MultiFab& sigma_fab, MultiFab& S_VB, MultiFab &S_out);
 	void compute_gradPhi(Geometry const& geom, MultiFab& S_phi, MultiFab &S_out);
@@ -29,6 +34,8 @@ class EMField
     int ref_ratio;
     Vector<int> n_cells;
     int max_grid_size;
+    
+    int ng = 1;
 
 
 	// For MLMG solver
@@ -44,23 +51,24 @@ class EMField
     Real tol_rel = 1.e-10;
     Real tol_abs = 0.0;
     
-    private:
-    
-	/*
 	Geometry S_geom;
-	BoxArray S_ba;
+	BoxArray S_grids;
 	DistributionMapping S_dmap;
 	
 	MultiFab solution;
-	MultiFab rhs;
-	MultiFab alpha_fab;
-	MultiFab sigma_fab;
 	
 	Real A_scalar;
 	Real B_scalar;
 	
+	
+	MultiFab alpha_fab;
+	MultiFab sigma_fab;
+	Array<MultiFab,AMREX_SPACEDIM> face_sigma_fabs;
+	
+	MultiFab rhs;
 	MultiFab VcrossB;
-	*/
+	MultiFab divVcrossB;
+	
 };
 
 
